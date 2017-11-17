@@ -1,12 +1,14 @@
-#########################################################################################
-#                                                                                       #
-#  Code to read in Gatekeeper spreadsheet and parse into a data frame                   #
-#                                                                                       #
-#########################################################################################
+########################################################################################
+#                                                                                      #
+#  Code to read in Gatekeeper spreadsheet and parse into a data frame                  #
+#                                                                                      #
+########################################################################################
 ## First, load up the gdata library, for reading xlsx files
 #install.packages('gdata')
 #install.packages('xlsx')
 library('gdata')
+library('tidyr')
+
 #library('xlsx')
 rm(list=ls())
 
@@ -22,7 +24,8 @@ FirstList <- FirstList[grepl('.xls$',FirstList)]
 
 mydf <- read.xls(file.path(datapath,FolderList[1],FirstList[1]),
                  sheet = 'Sheet1',
-                 perl = perl,header = F)
+                 perl = perl,
+                 header = F)
 
 ## Replace awkward NA's with ''
 mydf[is.na(mydf)] <- ''
@@ -46,26 +49,118 @@ for(i in mydf){
   }
 }
 ## Remove all columns with no data
-mydf <- mydf[-RemoveList]
+## This step is currently commented out, as it's simpler not to do this actually
+#mydf <- mydf[-RemoveList]
 
-## Find row numbers which start with a date
+## Find key anchors in the table (start of new farm and dates within each farm)
 k <- 0
 DatesDF <- data.frame()
+FarmList <- data.frame()
 ErrorList <- c()
+DateCol <- c()
 for(i in mydf){
   k <- k+1
-  RowNum <- which(grepl('^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',i))
-  if(!is.na(RowNum[1])){
+  ## Find entries which match a date format
+  RowNumDate <- which(grepl('^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',i))
+  if(!is.na(RowNumDate[1])){
     if(nrow(DatesDF)==0){
-      DatesDF <- data.frame(RowNum)
-    } else if(length(DatesDF[[1]])==length(RowNum)){
-      DatesDF <- data.frame(DatesDF,RowNum)
+      DatesDF <- data.frame(RowNumDate)
+      DateCol <- c(k)
+    } else if(length(DatesDF[[1]])==length(RowNumDate)){
+      DatesDF <- data.frame(DatesDF,RowNumDate)
+      DateCol <- c(DateCol,k)
     } else {
       ErrorList <- c(ErrorList,paste('Wrong number of dates in column',k))
       print(paste('Error: Number of dates do not match in column',k))
     }
   }
+  ## Find entries which say exactly 'Variety:'.  This should be in only one column
+  RowNumVari <- which(grepl('^Variety:$',i))
+  if(!is.na(RowNumVari[1])){
+    if(nrow(FarmList)==0){
+      RowNumFarm <- (RowNumVari - 1)
+      FarmList <- data.frame(RowNumFarm)
+      colnames(FarmList) <- c(k)
+    } else {
+      ErrorList <- c(ErrorList,
+                     paste('Found additional instance of Variety in column',k))
+      print(paste('Found additional instance of Variety in column',k))
+    }
+  }
+}
+## Assign column numbers to the dates dataframe
+colnames(DatesDF) <- DateCol
+
+## Determine the farm names from the variety column, as farm name is always directly
+## above the word variety in the spreadsheet
+FarmCol <- as.numeric(colnames(FarmList[1]))
+FarmNames <- c()
+for(i in 1:length(FarmList[[1]])){
+  FarmNames <- c(FarmNames,paste(mydf[FarmList[i,1],FarmCol]))
+}
+FarmList <- data.frame(FarmList,FarmNames)
+
+## Convert to characters, as splitting does not work so well with vectors
+mydf[] <- lapply(mydf, as.character)
+
+## Split the full data frame by farm, giving the preamble df the name 'Intro'
+tmp <- split(mydf, cumsum(1:nrow(mydf) %in% FarmList[[1]]))
+names(tmp) <- c('Intro',as.character(FarmList$FarmNames))
+
+## Now we have a large list, within which are data frames for each farm.
+## We want to split this by date, and populate a table with all the useful information
+## First, determine what that useful information is, and where it'll be found
+Data  <- c('Start Date','End Date',
+           'Start Time','End Time',
+           'Time',
+           'Weather','Temp','Wind speed/direction','Soil','Implement',
+           'Reference','Advisor','Operator')
+Regex <- c('^Start:$','^Finish:$',
+           '^Start:$','^Finish:$',
+           'gbfdgvbfdg',
+           '^Weather:$','^Temp °C:$','^Wind speed/direction:$','^Soil:$','^Implement:',
+           '^Reference:$','^Advisor:$','^Operator:$')
+PlusColumn <- c(2,2,7,5,0,3,2,6,1,0,4,3,3)
+DataLen    <- length(Data)
+PlusRow    <- numeric(DataLen)
+Position   <- numeric(DataLen)
+Result     <- character(DataLen)
+DataToLocate <- data.frame(Data,Regex,PlusColumn,PlusRow,Position,Result,
+                           stringsAsFactors = F)
+## Now, split each farm by event (date).  For this need to use the relative row number
+## rather than the full table row number determined pre-split
+for(i in 1:length(tmp)){
+  FirstRowTmp <- as.numeric(rownames(tmp[[i]]))[1]
+  tmp[[i]] <- split(tmp[[i]],
+                    cumsum(1:nrow(tmp[[i]]) %in% (DatesDF[[1]]-FirstRowTmp+1)))
+  DateList <- c()
+  DateTmp <- c()
+  for(j in 1:length(tmp[[i]])){
+    ##### NEW EDITS!!
+    
+    
+    ##### NEW EDITS!!
+    DateTmp <- tmp[[i]][[j]][1,3]
+    if(DateTmp==''){
+      DateTmp <- 'Intro'
+    }
+    DateList <- c(DateList,DateTmp)
+  }
+  names(tmp[[i]]) <- DateList
 }
 
 
-#V3 startdate V8 start time V13 enddate V18 end time
+
+nrowtmp <- nrow(tmp[[3]][[2]])
+tmplong <- gather(tmp[[3]][[2]],column,entry,colnames(tmp[[3]][[2]]),factor_key=TRUE)
+for(i in 1:nrow(DataToLocate)){
+  PosTmp <- which(grepl(DataToLocate$Regex[i],tmplong$entry))
+  if(!is.na(PosTmp[1])){
+    DataToLocate$Position[i] <-
+      PosTmp+(DataToLocate$PlusColumn[i]*nrowtmp)+DataToLocate$PlusRow[i]
+    DataToLocate$Result[i]   <- tmplong$entry[DataToLocate$Position[i]]
+  } else {
+    DataToLocate$Position[i] <- NA
+  }
+}
+warnings()
