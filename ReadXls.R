@@ -22,6 +22,9 @@ FolderList <- list.files(datapath)
 FirstList <- list.files(file.path(datapath,FolderList[1]))
 FirstList <- FirstList[grepl('.xls$',FirstList)]
 
+for(m in FirstList){}
+
+file.path(datapath,FolderList[1],FirstList[1])
 mydf <- read.xls(file.path(datapath,FolderList[1],FirstList[1]),
                  sheet = 'Sheet1',
                  perl = perl,
@@ -112,21 +115,24 @@ names(tmp) <- c('Intro',as.character(FarmList$FarmNames))
 ## First, determine what that useful information is, and where it'll be found
 Data  <- c('Start Date','End Date',
            'Start Time','End Time',
-           'Time',
            'Weather','Temp','Wind speed/direction','Soil','Implement',
            'Reference','Advisor','Operator')
-Regex <- c('^Start:$','^Finish:$',
-           '^Start:$','^Finish:$',
-           'gbfdgvbfdg',
+Regex <- c('^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',
+           '^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',
+           '^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',
+           '^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',
            '^Weather:$','^Temp °C:$','^Wind speed/direction:$','^Soil:$','^Implement:',
            '^Reference:$','^Advisor:$','^Operator:$')
-PlusColumn <- c(2,2,7,5,0,3,2,6,1,0,4,3,3)
-DataLen    <- length(Data)
-PlusRow    <- numeric(DataLen)
-Position   <- numeric(DataLen)
-Result     <- character(DataLen)
-DataToLocate <- data.frame(Data,Regex,PlusColumn,PlusRow,Position,Result,
+Occurrence   <- c(1,1,2,2,1,1,1,1,1,1,1,1)
+PlusColumn   <- c(0,0,5,3,3,2,6,1,0,4,3,3)
+DataLen      <- length(Data)
+PlusRow      <- numeric(DataLen)
+Position     <- numeric(DataLen)
+Result       <- character(DataLen)
+DataToLocate <- data.frame(Data,Regex,Occurrence,PlusColumn,PlusRow,Position,Result,
                            stringsAsFactors = F)
+
+AllData      <- list()
 ## Now, split each farm by event (date).  For this need to use the relative row number
 ## rather than the full table row number determined pre-split
 for(i in 1:length(tmp)){
@@ -136,31 +142,35 @@ for(i in 1:length(tmp)){
   DateList <- c()
   DateTmp <- c()
   for(j in 1:length(tmp[[i]])){
-    ##### NEW EDITS!!
-    
-    
-    ##### NEW EDITS!!
-    DateTmp <- tmp[[i]][[j]][1,3]
-    if(DateTmp==''){
+    ## We've split the data, and we're now just looking at one event in one farm
+    nrowtmp <- nrow(tmp[[i]][[j]])
+    ## Create a long version of the data.  This makes grepping easier
+    tmplong <- gather(tmp[[i]][[j]],column,entry,
+                      colnames(tmp[[i]][[j]]),factor_key=TRUE)
+    for(k in 1:DataLen){
+      PosTmp <- which(grepl(DataToLocate$Regex[k],tmplong$entry))
+      if(!is.na(PosTmp[1])){
+        DataToLocate$Position[k] <-
+          (PosTmp[DataToLocate$Occurrence[k]]+
+          (DataToLocate$PlusColumn[k]*nrowtmp) + DataToLocate$PlusRow[k])
+        DataToLocate$Result[k]   <- tmplong$entry[DataToLocate$Position[k]]
+      } else {
+        DataToLocate$Position[k] <- NA
+        DataToLocate$Result[k]   <- ''
+      }
+    }
+    if(DataToLocate$Result[1]==''){
       DateTmp <- 'Intro'
+    } else {
+      DateTmp <- DataToLocate$Result[1]
     }
     DateList <- c(DateList,DateTmp)
   }
   names(tmp[[i]]) <- DateList
+  print(DateList)
 }
 
+#which(!grepl('Start:|^$',tmp[[3]][[2]][[1]]))
+#PosTmp <- which(grepl(DataToLocate$Regex[k],tmplong$entry))
 
-
-nrowtmp <- nrow(tmp[[3]][[2]])
-tmplong <- gather(tmp[[3]][[2]],column,entry,colnames(tmp[[3]][[2]]),factor_key=TRUE)
-for(i in 1:nrow(DataToLocate)){
-  PosTmp <- which(grepl(DataToLocate$Regex[i],tmplong$entry))
-  if(!is.na(PosTmp[1])){
-    DataToLocate$Position[i] <-
-      PosTmp+(DataToLocate$PlusColumn[i]*nrowtmp)+DataToLocate$PlusRow[i]
-    DataToLocate$Result[i]   <- tmplong$entry[DataToLocate$Position[i]]
-  } else {
-    DataToLocate$Position[i] <- NA
-  }
-}
-warnings()
+#tmptmp <- c(tmptmp,list(data.frame(c(9,10,10),c(11,12,13))))
