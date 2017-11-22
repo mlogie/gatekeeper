@@ -3,8 +3,12 @@
 #  Section if the file is the awkward 'detailed' spreadsheet format                 #
 #                                                                                   #
 #####################################################################################
-read.detailed <- function(xlsdf){
-## Find key anchors in the table (start of new farm and dates within each farm)
+read.detailed <- function(xlsdf,columns,pfolder){
+  ## Create a list from which to build the table to return
+  TableData <- list()
+  for(i in columns){TableData <- c(TableData,list(character()))}
+
+  ## Find key anchors in the table (start of new farm and dates within each farm)
   k <- 0
   DatesDF <- data.frame()
   ErrorList <- c()
@@ -47,16 +51,17 @@ read.detailed <- function(xlsdf){
   
   ## Determine the farm names from the variety column, as farm name is always directly
   ## above the word variety in the spreadsheet
-  FarmNames <- c()
-  VarNames  <- c()
-  CropNames <- c()
-  
-  for(i in 1:length(RowNumFarm)){
-    FarmNames <- c(FarmNames,paste(xlsdf[RowNumFarm[i],1]))
-    VarNames  <- c(VarNames,paste(xlsdf[RowNumFarm[i]+1,4]))
-    CropNames <- c(CropNames,paste(xlsdf[RowNumFarm[i]+2,4]))
+  RowNumFarm <- c('Intro',RowNumFarm)
+  FarmNames  <- c('Intro')
+  VarNames   <- c('Intro')
+  CropNames  <- c('Intro')
+
+  for(i in 2:length(RowNumFarm)){
+    FarmNames <- c(FarmNames,paste(xlsdf[as.numeric(RowNumFarm[i]),1]))
+    VarNames  <- c(VarNames,paste(xlsdf[as.numeric(RowNumFarm[i])+1,4]))
+    CropNames <- c(CropNames,paste(xlsdf[as.numeric(RowNumFarm[i])+2,4]))
   }
-  
+
   FarmList <- data.frame(RowNumFarm,FarmNames,VarNames,CropNames)
   
   ## Convert to characters, as splitting does not work so well with vectors
@@ -64,21 +69,20 @@ read.detailed <- function(xlsdf){
   
   ## Split the full data frame by farm, giving the preamble df the name 'Intro'
   tmp <- split(xlsdf, cumsum(1:nrow(xlsdf) %in% FarmList[[1]]))
-  splitnames <- c('Intro',as.character(FarmList$FarmNames))
+  #splitnames <- c('Intro',as.character(FarmList$FarmNames))
+  splitnames <- c(as.character(FarmList$FarmNames))
   names(tmp) <- splitnames
   
   ## Convert the farm list to characters as this causes problems later if you don't
-  ## Add a first intro row so numbers match up later
   FarmList[] <- lapply(FarmList, as.character) 
-  FarmList   <- rbind(c('Intro','Intro','Intro','Intro'),FarmList)
+  #FarmList   <- rbind(c('Intro','Intro','Intro','Intro'),FarmList)
   
   ## Now we have a large list, within which are data frames for each farm.
   ## We want to split this by date, and populate a table with all the useful information
   ## First, determine what that useful information is, and where it'll be found
-  Data  <- c('Start Date','End Date',
-             'Start Time','End Time',
-             'Weather','Temp','Wind speed/direction','Soil','Implement',
-             'Reference','Advisor','Operator','Issued By')
+  Data  <- c('Start Date','End Date','Start Time','End Time',
+             'Weather','Temp','Wind speed/direction',
+             'Soil','Implement','Reference','Advisor','Operator','Issued By')
   Regex <- c('^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',
              '^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',
              '^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',
@@ -110,13 +114,20 @@ read.detailed <- function(xlsdf){
                         colnames(tmp[[i]][[j]]),factor_key=TRUE)
       
       for(k in 1:DataLen){
+        ## Look for data we want to extract using the regex from the table
         PosTmp <- which(grepl(DataToLocate$Regex[k],tmplong$entry))
         if(!is.na(PosTmp[1])){
+          ## Found one.  Work out where the data is to be found.
           DataToLocate$Position[k] <-
             (PosTmp[DataToLocate$Occurrence[k]]+
                (DataToLocate$PlusColumn[k]*nrowtmp) + DataToLocate$PlusRow[k])
           DataToLocate$Result[k]   <- tmplong$entry[DataToLocate$Position[k]]
+          if(grepl('^Implement:',DataToLocate$Result[k])){
+            DataToLocate$Result[k] <-
+              substr(DataToLocate$Result[k],12,nchar(DataToLocate$Result[k]))
+          }
         } else {
+          ## Not found
           DataToLocate$Position[k] <- NA
           DataToLocate$Result[k]   <- ''
         }
@@ -128,20 +139,22 @@ read.detailed <- function(xlsdf){
       }
       if(DateTmp!='Intro'){
         ## We are looking at a non-intro occurrence and we have a neat list of data
-        ## Problem is there is often more than one additive per event, so separate out
-        ## these additives
-        addsplit <- which(!grepl('Start:|^$',tmp[[i]][[j]][[1]]))
-        AllDataTmp <- DataToLocate[,c(1,2)]
-        AllDataTmp <- rbind(c('Farm',FarmList$FarmNames[i]),
-                            c('Variety',FarmList$VarNames[i]),
-                            c('Crop',FarmList$CropNames[i]),
-                            AllDataTmp)
-        
+        ## Problem is there is often more than one Product per event, so separate out
+        ## these Products
+        addsplit    <- which(!grepl('Start:|^$',tmp[[i]][[j]][[1]]))
+        AllDataTmp  <- DataToLocate[,c(1,2)]
+        AllDataFarm <- data.frame(Data=c('Parent','Farm','Crop','Variety'),
+                                  Result=c(pfolder,
+                                           FarmList$FarmNames[i],
+                                           FarmList$CropNames[i],
+                                           FarmList$VarNames[i]),
+                                  stringsAsFactors = F)
+
         for(l in addsplit){
-          ## Collect the additive and application figures.  Numbers here assume a
+          ## Collect the Product and application figures.  Numbers here assume a
           ## common format of spreadsheet.  This is not sophisticated enough to
           ## grep for everything
-          Additive    <- tmp[[i]][[j]][[1]][[l]]
+          Product     <- tmp[[i]][[j]][[1]][[l]]
           Area        <- tmp[[i]][[j]][[20]][[l]]
           AreaUnits   <- tmp[[i]][[j]][[25]][[l]]
           Volume      <- tmp[[i]][[j]][[29]][[l]]
@@ -150,25 +163,50 @@ read.detailed <- function(xlsdf){
           ## rest of the data, but are sometimes not present, which would mean we would
           ## be trying to get data out of bounds.
           if(nrow(tmp[[i]][[j]])==l){
+            ## We're at the bottom of the table, so no details present
             Details <- ''
           } else {
             Details     <- tmp[[i]][[j]][[2]][[l+1]]
-            if(!grepl('^MAPP',Details)){
+            if(grepl('^MAPP',Details)){
+              ## This is how the details always start.  Take the substr after 'MAPP:'
+              Details <- substr(Details,6,nchar(Details))
+            } else {
+              ## It's not details, so overwrite
               Details <- ''
             }
           }
-          AllDataTmp2 <- rbind(AllDataTmp,
-                               c('Additive',Additive),
-                               c('Details',Details),
-                               c('Area',Area),
-                               c('Area Units',AreaUnits),
-                               c('Volume',Volume),
-                               c('Volume Units',VolumeUnits))
-          AllData <- c(AllData,list(AllDataTmp2))
+          AllDataProd <- data.frame(Data=c('Product','Details',
+                                           'Area','Area Units',
+                                           'Rate','Rate Units'),
+                                    Result=c(Product,Details,
+                                             Area,AreaUnits,
+                                             Volume,VolumeUnits),
+                                    stringsAsFactors = F)
+
+          AllDataTmp2  <- rbind(AllDataFarm,
+                                AllDataProd,
+                                AllDataTmp,
+                                c('Source','Detailed'))
+
+          ## We've got a table with all the data from one product application.
+          ## Add it to the output list
+          for(a in 1:length(TableData)){
+            TableData[[a]] <- c(TableData[[a]],AllDataTmp2$Result[a])
+          }
         }
       }
     }
     names(tmp[[i]]) <- DateList
   } #End of detailed file reading
-  AllData
+  
+  ## Populate a neat data frame with the data
+  FullTable <- data.frame(TableData[[1]])
+  for(a in 2:length(TableData)){
+    FullTable <- data.frame(FullTable,TableData[[a]])
+  }
+  ## Name the columns
+  colnames(FullTable) <- columns
+  
+  ## Return the table
+  FullTable
 }

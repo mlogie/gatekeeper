@@ -11,44 +11,57 @@ rm(list=ls())
 library('gdata')
 library('tidyr')
 source('./ReadDetailed.R')
+source('./ReadCondensed.R')
 source('./RemoveList.R')
 
 ## Set the file path
 datapath <- file.path('.','Farm_data')
 perl <- 'C:/Strawberry/perl/bin/perl5.26.1.exe'
-## Discover all the folders in the data folder
-FolderList <- list.files(datapath)
 
-## Create a list of all the files in folder 1, and save just those in xls format
-FirstList <- list.files(file.path(datapath,FolderList[1]))
-FirstList <- FirstList[grepl('.xls$',FirstList)]
+## Discover all the files in the data folder
+FileList <- list.files(file.path(datapath),recursive=T)
+FileList <- FileList[grepl('.xls(x)?$',FileList)]
+
+## Set the output
 DataOut   <- c()
-m <- FirstList[1]
+## Create column headers for the table
+ColHeaders  <- c('Parent','Farm','Crop','Variety',
+                 'Product','Details','Area','Area Units','Rate','Rate Units',
+                 'Start Date','End Date','Start Time','End Time',
+                 'Weather','Temp','Wind speed/direction','Soil','Implement',
+                 'Reference','Advisor','Operator','Issued By','Source')
 
-for(m in 1:length(FirstList)){
-  mydf <- read.xls(file.path(datapath,FolderList[1],FirstList[m]),
+DataOut <- data.frame()
+for(i in ColHeaders){
+  DataOut <- data.frame(DataOut,character())
+}
+colnames(DataOut) <- ColHeaders
+
+for(i in FileList){
+  ## Read in the file
+  mydf <- read.xls(file.path(datapath,i),
                    sheet = 'Sheet1',
                    perl = perl,
                    header = F)
   
+  ##Find the parent folder for the file
+  ParentFolder <- substr(i,1,regexpr('\\/',i)[1]-1)
+  
   ## Replace awkward NA's with ''
   mydf[is.na(mydf)] <- ''
   
-  RemoveList <- remove.list(mydf)
-  ## Remove all columns with no data
-  ## This step is currently commented out, as it's simpler not to do this actually
-  #mydf <- mydf[-RemoveList]
-  
-  
-  #####################################################################################
-  #                                                                                   #
-  #  Section if the file is the awkward 'detailed' spreadsheet format                 #
-  #                                                                                   #
-  #####################################################################################
-  if(grepl('^Detailed',FirstList[m])){
-    TmpDF <- read.detailed(mydf)
-    DataOut <- c(DataOut,TmpDF)
+  ## Check whether file is detailed or condensed, then call the relevant function
+  if(grepl('\\/Detailed',i)){
+    TmpDF <- read.detailed(mydf,ColHeaders,ParentFolder)
+    FileType <- 'detailed'
+  } else if(grepl('\\/Condensed',i)){
+    TmpDF <- read.condensed(mydf,ColHeaders,ParentFolder)
+    FileType <- 'condensed'
   }
-  print(paste0('Finished reading file: ',FirstList[m],
-               ', file ',m,' of ',length(FirstList)))
+  DataOut <- rbind(DataOut,TmpDF)
+  print(paste0('Finished reading (',FileType,') file ',
+               match(i,FileList),' of ',length(FileList)))
+  print(paste('      ',(i)))
 }
+
+write.csv(DataOut,file.path(datapath,'Output','DataOut.csv'),row.names = F)
