@@ -1,4 +1,9 @@
-read.condensed <- function(xlsdf,columns,pfolder){
+#####################################################################################
+#                                                                                   #
+#  Section if the file is the basic 'condensed' spreadsheet format                  #
+#                                                                                   #
+#####################################################################################
+read.condensed <- function(xlsdf,columns,farmfolder){
   ## We have a condensed file, with data spread over three table columns
   ## First, split the file into 3 tables representing the three columns and remove blanks
   FirstTable  <- xlsdf[,1:6]
@@ -19,7 +24,7 @@ read.condensed <- function(xlsdf,columns,pfolder){
   ## Renumber
   rownames(AllTable) <- NULL
   
-  ## Find those without a date or blank entry, to start finding farm and other info
+  ## Find those without a date or blank entry, to start finding Field and other info
   InfoRows <- which(!(grepl('^[0-9][0-9]/[0-9][0-9]/[0-9][0-9]|^$',
                             AllTable$Date)|
                       grepl('^Printed:|^Gatekeeper|^Date|^Condensed|^Main Business',
@@ -32,21 +37,21 @@ read.condensed <- function(xlsdf,columns,pfolder){
   ## Convert vectors to characters
   AllTable[] <- lapply(AllTable, as.character)
   
-  ## Find farm row numbers
-  RowNumFarm <- c()
+  ## Find Field row numbers
+  RowNumField <- c()
   for(i in 1:length(InfoRows)){
     if((i %% 2)==1){
-      RowNumFarm <- c(RowNumFarm,InfoRows[i])
+      RowNumField <- c(RowNumField,InfoRows[i])
     }
   }
 
-  ## Split the full data frame by farm
-  tmp <- split(AllTable, cumsum(1:nrow(AllTable) %in% RowNumFarm))
+  ## Split the full data frame by Field
+  tmp <- split(AllTable, cumsum(1:nrow(AllTable) %in% RowNumField))
 
   AllTable <- data.frame()
   for(i in 2:length(tmp)){
-    tmp[[i]]$Farm <- tmp[[i]]$Date[1]
-    tmp[[i]]$Crop <- tmp[[i]]$Date[2]
+    tmp[[i]]$Field  <- tmp[[i]]$Date[1]
+    tmp[[i]]$Crop   <- tmp[[i]]$Date[2]
     tmp[[i]]$Source <- 'Condensed'
     tmp[[i]] <- tmp[[i]][-c(1,2),]
     AllTable <- rbind(AllTable,tmp[[i]])
@@ -59,28 +64,30 @@ read.condensed <- function(xlsdf,columns,pfolder){
   ## Reshuffle table to match the format obtained from detailed data
   TableLen  <- nrow(AllTable)
   
-  ## Use the parent folder passed to function to populate column of data
-  Parent <- rep(pfolder,TableLen)
+  ## Use the farm folder passed to function to populate column of data
+  Farm <- rep(farmfolder,TableLen)
   
   ## Create the area units column and append to rate unit column
   AreaUnits <- rep(UnitArea,TableLen)
   AllTable$RateUnits <- paste0(AllTable$RateUnits,'/',UnitArea)
   
+  ## Generate the year column
+  YearTmp <- substr(AllTable$Date,
+                    regexpr('\\/[0-9]*$',AllTable$Date)[1]+1,nchar(AllTable$Date))
+  
   ## Generate blank data missing from condensed operations summary
-  StartTime <- EndTime <- EndDate <- Weather <- Temp <- Windspeed <- character(TableLen)
-  Soil <- Implement <- Reference <- Advisor <- Operator <- character(TableLen)
-  IssuedBy <- Details <- Variety <- character(TableLen)
+  Blank <- character(TableLen)
   
   ## Build table
-  AllTable <- data.frame(Parent,AllTable$Farm,AllTable$Crop,Variety,
-                         AllTable$Product,Details,AllTable$Area,AreaUnits,
+  AllTable <- data.frame(Farm,AllTable$Field,AllTable$Crop,Blank,
+                         AllTable$Product,Blank,AllTable$Area,AreaUnits,
                          AllTable$Rate,AllTable$RateUnits,
-                         AllTable$Date,EndDate,StartTime,EndTime,
-                         Weather,Temp,Windspeed,Soil,Implement,
-                         Reference,Advisor,Operator,IssuedBy,AllTable$Source)
+                         YearTmp,AllTable$Date,Blank,Blank,Blank,
+                         Blank,Blank,Blank,Blank,Blank,
+                         Blank,Blank,Blank,Blank,AllTable$Source)
   ## Name the columns
   colnames(AllTable) <- columns
-  
+
   ## Return the table
   AllTable
 }

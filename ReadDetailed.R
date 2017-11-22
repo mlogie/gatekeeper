@@ -3,12 +3,12 @@
 #  Section if the file is the awkward 'detailed' spreadsheet format                 #
 #                                                                                   #
 #####################################################################################
-read.detailed <- function(xlsdf,columns,pfolder){
+read.detailed <- function(xlsdf,columns,farmfolder){
   ## Create a list from which to build the table to return
   TableData <- list()
   for(i in columns){TableData <- c(TableData,list(character()))}
 
-  ## Find key anchors in the table (start of new farm and dates within each farm)
+  ## Find key anchors in the table (start of new Field and dates within each Field)
   k <- 0
   DatesDF <- data.frame()
   ErrorList <- c()
@@ -38,7 +38,7 @@ read.detailed <- function(xlsdf,columns,pfolder){
     ## Find entries which say exactly 'Variety:'.  This should be in only one column
     RowNumVari <- which(grepl('^Variety:$',i))
     if(!is.na(RowNumVari[1])){
-      RowNumFarm <- (RowNumVari - 1)
+      RowNumField <- (RowNumVari - 1)
     } else if(k==1){
       ErrorList <- c(ErrorList,
                      paste('Found no instance of Variety',k))
@@ -49,35 +49,33 @@ read.detailed <- function(xlsdf,columns,pfolder){
   ## Assign column numbers to the dates dataframe
   colnames(DatesDF) <- DateCol
   
-  ## Determine the farm names from the variety column, as farm name is always directly
+  ## Determine the Field names from the variety column, as Field name is always directly
   ## above the word variety in the spreadsheet
-  RowNumFarm <- c('Intro',RowNumFarm)
-  FarmNames  <- c('Intro')
-  VarNames   <- c('Intro')
-  CropNames  <- c('Intro')
+  RowNumField <- c('Intro',RowNumField)
+  FieldNames  <- c('Intro')
+  VarNames    <- c('Intro')
+  CropNames   <- c('Intro')
 
-  for(i in 2:length(RowNumFarm)){
-    FarmNames <- c(FarmNames,paste(xlsdf[as.numeric(RowNumFarm[i]),1]))
-    VarNames  <- c(VarNames,paste(xlsdf[as.numeric(RowNumFarm[i])+1,4]))
-    CropNames <- c(CropNames,paste(xlsdf[as.numeric(RowNumFarm[i])+2,4]))
+  for(i in 2:length(RowNumField)){
+    FieldNames <- c(FieldNames,paste(xlsdf[as.numeric(RowNumField[i]),1]))
+    VarNames   <- c(VarNames,paste(xlsdf[as.numeric(RowNumField[i])+1,4]))
+    CropNames  <- c(CropNames,paste(xlsdf[as.numeric(RowNumField[i])+2,4]))
   }
 
-  FarmList <- data.frame(RowNumFarm,FarmNames,VarNames,CropNames)
+  FieldList <- data.frame(RowNumField,FieldNames,VarNames,CropNames)
   
   ## Convert to characters, as splitting does not work so well with vectors
   xlsdf[] <- lapply(xlsdf, as.character)
   
-  ## Split the full data frame by farm, giving the preamble df the name 'Intro'
-  tmp <- split(xlsdf, cumsum(1:nrow(xlsdf) %in% FarmList[[1]]))
-  #splitnames <- c('Intro',as.character(FarmList$FarmNames))
-  splitnames <- c(as.character(FarmList$FarmNames))
+  ## Split the full data frame by Field, giving the preamble df the name 'Intro'
+  tmp <- split(xlsdf, cumsum(1:nrow(xlsdf) %in% FieldList[[1]]))
+  splitnames <- c(as.character(FieldList$FieldNames))
   names(tmp) <- splitnames
   
-  ## Convert the farm list to characters as this causes problems later if you don't
-  FarmList[] <- lapply(FarmList, as.character) 
-  #FarmList   <- rbind(c('Intro','Intro','Intro','Intro'),FarmList)
-  
-  ## Now we have a large list, within which are data frames for each farm.
+  ## Convert the Field list to characters as this causes problems later if you don't
+  FieldList[] <- lapply(FieldList, as.character) 
+
+  ## Now we have a large list, within which are data frames for each Field.
   ## We want to split this by date, and populate a table with all the useful information
   ## First, determine what that useful information is, and where it'll be found
   Data  <- c('Start Date','End Date','Start Time','End Time',
@@ -98,7 +96,7 @@ read.detailed <- function(xlsdf,columns,pfolder){
   DataToLocate <- data.frame(Data,Result,Regex,Occurrence,PlusColumn,PlusRow,Position,
                              stringsAsFactors = F)
   
-  ## Now, split each farm by event (date).  For this need to use the relative row
+  ## Now, split each Field by event (date).  For this need to use the relative row
   ## number rather than the full table row number determined pre-split
   for(i in 1:length(tmp)){
     FirstRowTmp <- as.numeric(rownames(tmp[[i]]))[1]
@@ -107,7 +105,7 @@ read.detailed <- function(xlsdf,columns,pfolder){
     DateList <- c()
     DateTmp <- c()
     for(j in 1:length(tmp[[i]])){
-      ## We've split the data, and we're now just looking at one event in one farm
+      ## We've split the data, and we're now just looking at one event in one Field
       nrowtmp <- nrow(tmp[[i]][[j]])
       ## Create a long version of the data.  This makes grepping easier
       tmplong <- gather(tmp[[i]][[j]],column,entry,
@@ -143,12 +141,12 @@ read.detailed <- function(xlsdf,columns,pfolder){
         ## these Products
         addsplit    <- which(!grepl('Start:|^$',tmp[[i]][[j]][[1]]))
         AllDataTmp  <- DataToLocate[,c(1,2)]
-        AllDataFarm <- data.frame(Data=c('Parent','Farm','Crop','Variety'),
-                                  Result=c(pfolder,
-                                           FarmList$FarmNames[i],
-                                           FarmList$CropNames[i],
-                                           FarmList$VarNames[i]),
-                                  stringsAsFactors = F)
+        AllDataField <- data.frame(Data=c('Farm','Field','Crop','Variety'),
+                                   Result=c(farmfolder,
+                                            FieldList$FieldNames[i],
+                                            FieldList$CropNames[i],
+                                            FieldList$VarNames[i]),
+                                   stringsAsFactors = F)
 
         for(l in addsplit){
           ## Collect the Product and application figures.  Numbers here assume a
@@ -182,9 +180,14 @@ read.detailed <- function(xlsdf,columns,pfolder){
                                              Area,AreaUnits,
                                              Volume,VolumeUnits),
                                     stringsAsFactors = F)
+          YearTmp <- substr(AllDataTmp$Result[1],
+                            regexpr('\\/[0-9]*$',
+                                    AllDataTmp$Result[1])[1]+1,
+                                    nchar(AllDataTmp$Result[1]))
 
-          AllDataTmp2  <- rbind(AllDataFarm,
+          AllDataTmp2  <- rbind(AllDataField,
                                 AllDataProd,
+                                c('Year',YearTmp),
                                 AllDataTmp,
                                 c('Source','Detailed'))
 

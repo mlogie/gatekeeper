@@ -12,6 +12,7 @@ library('gdata')
 library('tidyr')
 source('./ReadDetailed.R')
 source('./ReadCondensed.R')
+source('./ReadAnalysis.R')
 source('./RemoveList.R')
 
 ## Set the file path
@@ -20,14 +21,14 @@ perl <- 'C:/Strawberry/perl/bin/perl5.26.1.exe'
 
 ## Discover all the files in the data folder
 FileList <- list.files(file.path(datapath),recursive=T)
-FileList <- FileList[grepl('.xls(x)?$',FileList)]
+FileList <- FileList[grepl('xls(x)?$|csv$',FileList)]
 
 ## Set the output
 DataOut   <- c()
 ## Create column headers for the table
-ColHeaders  <- c('Parent','Farm','Crop','Variety',
+ColHeaders  <- c('Farm','Field','Crop','Variety',
                  'Product','Details','Area','Area Units','Rate','Rate Units',
-                 'Start Date','End Date','Start Time','End Time',
+                 'Year','Start Date','End Date','Start Time','End Time',
                  'Weather','Temp','Wind speed/direction','Soil','Implement',
                  'Reference','Advisor','Operator','Issued By','Source')
 
@@ -38,30 +39,43 @@ for(i in ColHeaders){
 colnames(DataOut) <- ColHeaders
 
 for(i in FileList){
+  FileType <- ''
   ## Read in the file
-  mydf <- read.xls(file.path(datapath,i),
-                   sheet = 'Sheet1',
-                   perl = perl,
-                   header = F)
-  
+  if(grepl('xls(x)?$',i)){
+    mydf <- read.xls(file.path(datapath,i),
+                     sheet = 'Sheet1',
+                     perl = perl,
+                     header = F)
+  } else if(grepl('csv$',i)){
+    mydf <- read.csv(file.path(datapath,i))
+  }
+
   ##Find the parent folder for the file
-  ParentFolder <- substr(i,1,regexpr('\\/',i)[1]-1)
+  FarmFolder <- substr(i,1,regexpr('\\/',i)[1]-1)
   
   ## Replace awkward NA's with ''
   mydf[is.na(mydf)] <- ''
-  
+
   ## Check whether file is detailed or condensed, then call the relevant function
-  if(grepl('\\/Detailed',i)){
-    TmpDF <- read.detailed(mydf,ColHeaders,ParentFolder)
+  if(grepl('\\/Detailed.*xls(x)?$',i)){
+    TmpDF <- read.detailed(mydf,ColHeaders,FarmFolder)
     FileType <- 'detailed'
-  } else if(grepl('\\/Condensed',i)){
-    TmpDF <- read.condensed(mydf,ColHeaders,ParentFolder)
+  } else if(grepl('\\/Condensed.*xls(x)?$',i)){
+    TmpDF <- read.condensed(mydf,ColHeaders,FarmFolder)
     FileType <- 'condensed'
+  } else if(grepl('\\/Analysis.*csv$',i)){
+    TmpDF <- read.analysis(mydf,ColHeaders,FarmFolder)
+    FileType <- 'analysis'
   }
-  DataOut <- rbind(DataOut,TmpDF)
-  print(paste0('Finished reading (',FileType,') file ',
-               match(i,FileList),' of ',length(FileList)))
+  if(FileType!=''){
+    DataOut <- rbind(DataOut,TmpDF)
+    print(paste0('Finished reading (',FileType,') file ',
+                 match(i,FileList),' of ',length(FileList),':'))
+  } else {
+    print(paste0('Did not read file (',FileType,') file ',
+                 match(i,FileList),' of ',length(FileList),':'))
+  }
   print(paste('      ',(i)))
 }
 
-write.csv(DataOut,file.path(datapath,'Output','DataOut.csv'),row.names = F)
+write.csv(DataOut,file.path('.','Output','DataOut.csv'),row.names = F)
