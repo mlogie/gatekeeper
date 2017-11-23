@@ -15,10 +15,24 @@ read.detailed <- function(xlsdf,columns,farmfolder){
   DateCol <- c()
   AllData <- c()
   
-  ## Remove all rows which just start with when the file was printed or Gatekeeper
-  xlsdf <- xlsdf[-which(grepl('^Printed:|^Gatekeeper',xlsdf[[1]])),]
-  rownames(xlsdf) <- seq(length=nrow(xlsdf))
+  ## Find all rows which just start with when the file was printed or 'Gatekeeper'
+  RemRow   <- which(grepl('^Printed:|^Gatekeeper',xlsdf[[1]]))
   
+  ## Also find rows which have a date but no 'Start' text.  This is because a record
+  ## has spilled over two pages resulting in unnecessary repetition in the spreadsheet
+  ## Remove this row and the row below it
+  DateRow  <- which(grepl('^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',xlsdf[[3]]))
+  StartRow <- which(!grepl('^Start:',xlsdf[[1]]))
+  RemRow2  <- intersect(DateRow,StartRow)
+  RemRow3  <- RemRow2+1
+  RemRow   <- c(RemRow,RemRow2,RemRow3)
+
+  ## Now remove these rows
+  xlsdf    <- xlsdf[-RemRow,]
+
+  ## Resequence the row ID numbers
+  rownames(xlsdf) <- seq(length=nrow(xlsdf))
+
   for(i in xlsdf){
     k <- k+1
     ## Find entries which match a date format
@@ -35,6 +49,7 @@ read.detailed <- function(xlsdf,columns,farmfolder){
         print(paste('Error: Number of dates do not match in column',k))
       }
     }
+
     ## Find entries which say exactly 'Variety:'.  This should be in only one column
     RowNumVari <- which(grepl('^Variety:$',i))
     if(!is.na(RowNumVari[1])){
@@ -45,10 +60,10 @@ read.detailed <- function(xlsdf,columns,farmfolder){
       print(paste('Found no instance of Variety in column',k))
     }
   }
-  
+
   ## Assign column numbers to the dates dataframe
   colnames(DatesDF) <- DateCol
-  
+ 
   ## Determine the Field names from the variety column, as Field name is always directly
   ## above the word variety in the spreadsheet
   RowNumField <- c('Intro',RowNumField)
@@ -87,15 +102,18 @@ read.detailed <- function(xlsdf,columns,farmfolder){
              '^[0-9][0-9]\\/[0-9][0-9]\\/[0-9][0-9]',
              '^Weather:$','^Temp °C:$','^Wind speed/direction:$','^Soil:$',
              '^Implement:','^Reference:$','^Advisor:$','^Operator:$','^Issued by:$')
-  Occurrence   <- c(1,2,1,2,1,1,1,1,1,1,1,1,1)
-  PlusColumn   <- c(0,0,5,3,3,2,6,1,0,4,3,3,3)
-  DataLen      <- length(Data)
-  PlusRow      <- numeric(DataLen)
-  Position     <- numeric(DataLen)
-  Result       <- character(DataLen)
-  DataToLocate <- data.frame(Data,Result,Regex,Occurrence,PlusColumn,PlusRow,Position,
-                             stringsAsFactors = F)
-  
+  Occurrence <- c(1,2,1,2,1,1,1,1,1,1,1,1,1)
+  PlusColumn <- c(0,0,5,3,3,2,6,1,0,4,3,3,3)
+  DataLen    <- length(Data)
+  PlusRow    <- numeric(DataLen)
+  Position   <- numeric(DataLen)
+  RowTable   <- numeric(DataLen)
+  ColTable   <- numeric(DataLen)
+  Result     <- character(DataLen)
+  DTL        <- data.frame(Data,Result,Regex,Occurrence,PlusColumn,PlusRow,Position,
+                           RowTable,ColTable,
+                           stringsAsFactors = F)
+
   ## Now, split each Field by event (date).  For this need to use the relative row
   ## number rather than the full table row number determined pre-split
   for(i in 1:length(tmp)){
@@ -113,34 +131,43 @@ read.detailed <- function(xlsdf,columns,farmfolder){
       
       for(k in 1:DataLen){
         ## Look for data we want to extract using the regex from the table
-        PosTmp <- which(grepl(DataToLocate$Regex[k],tmplong$entry))
+        PosTmp <- which(grepl(DTL$Regex[k],tmplong$entry))
         if(!is.na(PosTmp[1])){
           ## Found one.  Work out where the data is to be found.
-          DataToLocate$Position[k] <-
-            (PosTmp[DataToLocate$Occurrence[k]]+
-               (DataToLocate$PlusColumn[k]*nrowtmp) + DataToLocate$PlusRow[k])
-          DataToLocate$Result[k]   <- tmplong$entry[DataToLocate$Position[k]]
-          if(grepl('^Implement:',DataToLocate$Result[k])){
-            DataToLocate$Result[k] <-
-              substr(DataToLocate$Result[k],12,nchar(DataToLocate$Result[k]))
+          ## First, find the row using the modulus of the position in the long table
+          DTL$RowTable[k] <- PosTmp[DTL$Occurrence[k]] %% nrowtmp
+          if(DTL$RowTable[k]==0){DTL$RowTable[k] <- nrowtmp}
+          DTL$RowTable[k] <- DTL$RowTable[k]+DTL$PlusRow[k]
+          ## Then find the column using the remainder function
+          DTL$ColTable[k] <-
+            ((PosTmp[DTL$Occurrence[k]]-1) %/% nrowtmp)+1
+          DTL$ColTable[k] <- DTL$ColTable[k]+DTL$PlusColumn[k]
+          ## Then find the result using the x/y coordinates just found in the table
+          DTL$Result[k] <-
+            tmp[[i]][[j]][DTL$RowTable[k],DTL$ColTable[k]]
+          #DTL$Result[k]   <- tmplong$entry[DTL$Position[k]]
+          
+          if(grepl('^Implement:',DTL$Result[k])){
+            DTL$Result[k] <-
+              substr(DTL$Result[k],12,nchar(DTL$Result[k]))
           }
         } else {
           ## Not found
-          DataToLocate$Position[k] <- NA
-          DataToLocate$Result[k]   <- ''
+          DTL$Position[k] <- NA
+          DTL$Result[k]   <- ''
         }
       }
-      if(DataToLocate$Result[1]==''){
+      if(DTL$Result[1]==''){
         DateTmp <- 'Intro'
       } else {
-        DateTmp <- DataToLocate$Result[1]
+        DateTmp <- DTL$Result[1]
       }
       if(DateTmp!='Intro'){
         ## We are looking at a non-intro occurrence and we have a neat list of data
         ## Problem is there is often more than one Product per event, so separate out
         ## these Products
         addsplit    <- which(!grepl('Start:|^$',tmp[[i]][[j]][[1]]))
-        AllDataTmp  <- DataToLocate[,c(1,2)]
+        AllDataTmp  <- DTL[,c(1,2)]
         AllDataField <- data.frame(Data=c('Farm','Field','Crop','Variety'),
                                    Result=c(farmfolder,
                                             FieldList$FieldNames[i],
@@ -149,22 +176,50 @@ read.detailed <- function(xlsdf,columns,farmfolder){
                                    stringsAsFactors = F)
 
         for(l in addsplit){
-          ## Collect the Product and application figures.  Numbers here assume a
-          ## common format of spreadsheet.  This is not sophisticated enough to
-          ## grep for everything
-          Product     <- tmp[[i]][[j]][[1]][[l]]
-          Area        <- tmp[[i]][[j]][[20]][[l]]
-          AreaUnits   <- tmp[[i]][[j]][[25]][[l]]
-          Volume      <- tmp[[i]][[j]][[29]][[l]]
-          VolumeUnits <- tmp[[i]][[j]][[33]][[l]]
+          ## Collect the Product and application figures.  Find the row with the
+          ## product then look along the row for the occurrence of numbers and other
+          ## letters which denote: Area, Area Units, Volume, Volume Units
+          ProductRow <- as.character(tmp[[i]][[j]][l,])
+          ## The product is always the first item in the row
+          Product    <- ProductRow[1]
+          
+          ## Find entries with numbers but no letters (some products contain numbers)
+          Numbers     <- grep('[0-9]+',ProductRow,value=T)
+          NumbersOnly <- grep('[A-Za-z]+',Numbers,invert=T,value=T)
+          ## The first number is area, the second is volume
+          if(!is.na(NumbersOnly[1])){
+            Area <- NumbersOnly[1]
+          } else {
+            Area <- ''
+          }
+          if(!is.na(NumbersOnly[2])){
+            Volume <- NumbersOnly[2]
+          } else {
+            Volume <- ''
+          }
+          
+          ## Find entries with letters.  This will include the product (entry one)
+          Text <- as.character(grep('[A-Za-z]+',ProductRow,value=T))
+          ## The second entry is area units, the third is volume units
+          if(!is.na(Text[2])){
+            AreaUnits <- Text[2]
+          } else {
+            AreaUnits <- ''
+          }
+          if(!is.na(Text[3])){
+            VolumeUnits <- Text[3]
+          } else {
+            VolumeUnits <- ''
+          }
+
           ## The details are a bit more complicated as they are given one row below the
           ## rest of the data, but are sometimes not present, which would mean we would
-          ## be trying to get data out of bounds.
+          ## be trying to get data out of bounds of the table.
           if(nrow(tmp[[i]][[j]])==l){
             ## We're at the bottom of the table, so no details present
             Details <- ''
           } else {
-            Details     <- tmp[[i]][[j]][[2]][[l+1]]
+            Details <- tmp[[i]][[j]][l+1,2]
             if(grepl('^MAPP',Details)){
               ## This is how the details always start.  Take the substr after 'MAPP:'
               Details <- substr(Details,6,nchar(Details))
