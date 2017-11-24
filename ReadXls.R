@@ -4,8 +4,7 @@
 #  For this to run, you need a perl executable saved locally, to match the location    #
 #  given just below and saved as value 'perl'.  You also need the gdata and tidyr      #
 #  packages installed.                                                                 #
-#  This code assumes you have farm spreadsheets saved in the subfolder 'Farm_data'     #
-#  and that you have a subfolder ready for the output data named 'Output'              #
+#  This code assumes you have farm spreadsheets saved in the subfolder 'Farm_data'     #           #
 #                                                                                      #
 ########################################################################################
 rm(list=ls())
