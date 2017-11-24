@@ -1,9 +1,15 @@
 ########################################################################################
 #                                                                                      #
-#  Code to read in Gatekeeper spreadsheet and parse into a data frame                  #
+#  Code to read in Gatekeeper spreadsheets, parse into a data frame and write to csv   #
+#  For this to run, you need a perl executable saved locally, to match the location    #
+#  given just below and saved as value 'perl'.  You also need the gdata and tidyr      #
+#  packages installed.                                                                 #
+#  This code assumes you have farm spreadsheets saved in the subfolder 'Farm_data'     #
+#  and that you have a subfolder ready for the output data named 'Output'              #
 #                                                                                      #
 ########################################################################################
 rm(list=ls())
+perl <- 'C:/Strawberry/perl/bin/perl5.26.1.exe'
 
 ## First, load up the libraries and functions
 #install.packages('gdata')
@@ -17,7 +23,6 @@ source('./RemoveList.R')
 
 ## Set the file path
 datapath <- file.path('.','Farm_data')
-perl <- 'C:/Strawberry/perl/bin/perl5.26.1.exe'
 
 ## Discover all the files in the data folder
 FileList <- list.files(file.path(datapath),recursive=T)
@@ -78,5 +83,17 @@ for(i in FileList){
   print(paste('      ',(i)))
 }
 
-write.csv(DataOut,file.path('.','Output','DataOut.csv'),row.names = F)
+## Check if we have the output folder, and if not, create one for the output file
+if(!dir.exists(file.path('.','Output'))){
+  dir.create(file.path('.','Output'))
+}
 
+## Do a bit of error checking, then if all good output the data frame to a csv
+if(!dir.exists(datapath)){
+  stop('Cannot find folder Farm_data')
+} else if(is.na(FileList[1])){
+  stop('Unable to find files in Farm_data folder')
+} else {
+  write.csv(DataOut,file.path('.','Output','DataOut.csv'),row.names = F)
+  print(paste('File saved to:',file.path('.','Output','DataOut.csv')))
+}
