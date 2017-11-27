@@ -21,6 +21,7 @@ source('./ReadCondensed.R')
 source('./ReadAnalysis.R')
 source('./RemoveList.R')
 source('./OutputRepro.R')
+source('./LookupTable.R')
 
 ## Set the file path
 datapath <- file.path('.','Farm_data')
@@ -91,7 +92,22 @@ if(!dir.exists(file.path('.','Output'))){
   dir.create(file.path('.','Output'))
 }
 
-## Do a bit of error checking, then if all good output the data frame to a csv
+## Make a lookup table to populate the data frame with additional data regarding
+## product details (manufacturer, active ingredients, product ID), where possible
+LookupTable <- lookup.table(DataOut)
+## Find products in the Data Out table with no details
+Blanks  <- which(DataOut$`Active Ingredients`=='')
+## Match all these products with the products in lookup table which we do have data for
+Matches <- match(DataOut$Product[Blanks],LookupTable$Product)
+## Remove all entries which there is no match for
+Blanks  <- Blanks[which(!is.na(Matches))]
+Matches <- Matches[which(!is.na(Matches))]
+## Set all the product IDs, Active Ingredients and Manufacturers using the Lookup Table
+DataOut$ProductID[Blanks]            <- LookupTable$ProductID[Matches]
+DataOut$`Active Ingredients`[Blanks] <- LookupTable$`Active Ingredients`[Matches]
+DataOut$Manufacturer[Blanks]         <- LookupTable$Manufacturer[Matches]
+
+## Do a bit of error checking, then, if all good, output the data frame to a csv
 if(!dir.exists(datapath)){
   stop('Cannot find folder Farm_data')
 } else if(is.na(FileList[1])){
@@ -103,11 +119,6 @@ if(!dir.exists(datapath)){
 
 ## Create list for summary and run summary function
 SummaryCols <- c('Farm','Field','Crop','Variety','Product')
-ReturnList  <- repro.field.summary(DataOut,SummaryCols,'ProductSummary.csv')
+ReturnList  <- repro.field.summary(DataOut,SummaryCols,
+                                   'ProductSummary.csv',writetofile=T)
 print(ReturnList$msg)
-
-## Create product lookup table
-SummaryCols <- c('Product','ProductID','Active Ingredients')
-ReturnList  <- repro.field.summary(DataOut,SummaryCols,'ProductDetailLookup.csv')
-print(ReturnList$msg)
-tmpdf <- ReturnList$df
