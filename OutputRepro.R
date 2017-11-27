@@ -5,20 +5,21 @@
 #                                                                                       #
 #########################################################################################
 ## Produce summary of unique field specific terms, passed in as a list
-field.summary <- function(dataoutdf,columnsummary){
+repro.field.summary <- function(dataoutdf,columnsummary,filename){
   summarydf  <- unique(dataoutdf[,columnsummary])
-  returnlist <- list(summarydf,'FieldSummary.csv')
+  ## Check if we have the output folder, and if not, create one for the output file
+  if(!dir.exists(file.path('.','Output'))){
+    dir.create(file.path('.','Output'))
+  }
+  ## Write to file.  The first item in the list is the data, the second is the name
+  write.csv(summarydf,file.path('.','Output',filename),row.names = F)
+  
+  returnmsg  <- paste('File saved to:',file.path('.','Output',filename))
+  returnlist <- list(returnmsg,summarydf)
+  names(returnlist) <- c('msg','df')
   returnlist
 }
 
-## Create list for summary and run summary function
-SummaryCols <- c('Farm','Field','Crop','Variety','Product')
-OutputTmp <- field.summary(DataOut,SummaryCols)
 
-## Check if we have the output folder, and if not, create one for the output file
-if(!dir.exists(file.path('.','Output'))){
-  dir.create(file.path('.','Output'))
-}
 
-write.csv(OutputTmp[[1]],file.path('.','Output',OutputTmp[[2]]),row.names = F)
-print(paste('File saved to:',file.path('.','Output',OutputTmp[[2]])))
+

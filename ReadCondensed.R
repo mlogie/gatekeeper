@@ -80,7 +80,8 @@ read.condensed <- function(xlsdf,columns,farmfolder){
   
   ## Build table
   AllTable <- data.frame(Farm,AllTable$Field,AllTable$Crop,Blank,
-                         AllTable$Product,Blank,AllTable$Area,AreaUnits,
+                         AllTable$Product,Blank,Blank,Blank,Blank,Blank,
+                         AllTable$Area,AreaUnits,
                          AllTable$Rate,AllTable$RateUnits,
                          YearTmp,AllTable$Date,Blank,Blank,Blank,
                          Blank,Blank,Blank,Blank,Blank,

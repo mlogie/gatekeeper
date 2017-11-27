@@ -16,6 +16,7 @@ perl <- 'C:/Strawberry/perl/bin/perl5.26.1.exe'
 library('gdata')
 library('tidyr')
 source('./ReadDetailed.R')
+source('./ParseDetails.R')
 source('./ReadCondensed.R')
 source('./ReadAnalysis.R')
 source('./RemoveList.R')
@@ -32,7 +33,9 @@ FileList <- FileList[grepl('xls(x)?$|csv$',FileList)]
 DataOut   <- c()
 ## Create column headers for the table
 ColHeaders  <- c('Farm','Field','Crop','Variety',
-                 'Product','Details','Area','Area Units','Rate','Rate Units',
+                 'Product','ProductID',
+                 'Harvest Interval','Active Ingredients','Manufacturer','Expires',
+                 'Area','Area Units','Rate','Rate Units',
                  'Year','Start Date','End Date','Start Time','End Time',
                  'Weather','Temp','Wind speed/direction','Soil','Implement',
                  'Reference','Advisor','Operator','Issued By','Source')
@@ -97,3 +100,14 @@ if(!dir.exists(datapath)){
   write.csv(DataOut,file.path('.','Output','DataOut.csv'),row.names = F)
   print(paste('File saved to:',file.path('.','Output','DataOut.csv')))
 }
+
+## Create list for summary and run summary function
+SummaryCols <- c('Farm','Field','Crop','Variety','Product')
+ReturnList  <- repro.field.summary(DataOut,SummaryCols,'ProductSummary.csv')
+print(ReturnList$msg)
+
+## Create product lookup table
+SummaryCols <- c('Product','ProductID','Active Ingredients')
+ReturnList  <- repro.field.summary(DataOut,SummaryCols,'ProductDetailLookup.csv')
+print(ReturnList$msg)
+tmpdf <- ReturnList$df

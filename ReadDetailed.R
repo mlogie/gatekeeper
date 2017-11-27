@@ -4,6 +4,7 @@
 #                                                                                   #
 #####################################################################################
 read.detailed <- function(xlsdf,columns,farmfolder){
+  source('./ParseDetails.R')
   ## Create a list from which to build the table to return
   TableData <- list()
   for(i in columns){TableData <- c(TableData,list(character()))}
@@ -136,18 +137,21 @@ read.detailed <- function(xlsdf,columns,farmfolder){
           ## Found one.  Work out where the data is to be found.
           ## First, find the row using the modulus of the position in the long table
           DTL$RowTable[k] <- PosTmp[DTL$Occurrence[k]] %% nrowtmp
+          ## This will resolve to 0 if the data is in the bottom row, so if 0, set row
+          ## number to be the number of rows
           if(DTL$RowTable[k]==0){DTL$RowTable[k] <- nrowtmp}
-          DTL$RowTable[k] <- DTL$RowTable[k]+DTL$PlusRow[k]
           ## Then find the column using the remainder function
-          DTL$ColTable[k] <-
-            ((PosTmp[DTL$Occurrence[k]]-1) %/% nrowtmp)+1
-          DTL$ColTable[k] <- DTL$ColTable[k]+DTL$PlusColumn[k]
-          ## Then find the result using the x/y coordinates just found in the table
-          DTL$Result[k] <-
-            tmp[[i]][[j]][DTL$RowTable[k],DTL$ColTable[k]]
-          #DTL$Result[k]   <- tmplong$entry[DTL$Position[k]]
+          DTL$ColTable[k] <- ((PosTmp[DTL$Occurrence[k]]-1) %/% nrowtmp)+1
           
+          ## Shift rows and columns based on standard table format
+          DTL$RowTable[k] <- DTL$RowTable[k]+DTL$PlusRow[k]
+          DTL$ColTable[k] <- DTL$ColTable[k]+DTL$PlusColumn[k]
+          
+          ## Then find the result using the x/y coordinates just found in the table
+          DTL$Result[k] <- tmp[[i]][[j]][DTL$RowTable[k],DTL$ColTable[k]]
+
           if(grepl('^Implement:',DTL$Result[k])){
+          ## Get rid of the word 'Implement' to make results more readable
             DTL$Result[k] <-
               substr(DTL$Result[k],12,nchar(DTL$Result[k]))
           }
@@ -217,21 +221,33 @@ read.detailed <- function(xlsdf,columns,farmfolder){
           ## be trying to get data out of bounds of the table.
           if(nrow(tmp[[i]][[j]])==l){
             ## We're at the bottom of the table, so no details present
-            Details <- ''
+            DetailsList <- list(ProductID='',HarvestInterval='',
+                                ActiveIngredients='',Manufacturer='',
+                                Expires='')
           } else {
             Details <- tmp[[i]][[j]][l+1,2]
             if(grepl('^MAPP',Details)){
-              ## This is how the details always start.  Take the substr after 'MAPP:'
-              Details <- substr(Details,6,nchar(Details))
+              ## This is how the details always start.  Pass this to the details parser
+              DetailsList <- parse.details(Details)
             } else {
               ## It's not details, so overwrite
-              Details <- ''
+              DetailsList <- list(ProductID='',HarvestInterval='',
+                                  ActiveIngredients='',Manufacturer='',
+                                  Expires='')
+              
             }
           }
-          AllDataProd <- data.frame(Data=c('Product','Details',
+          AllDataProd <- data.frame(Data=c('Product','ProductID',
+                                           'Harvest Interval','Active Ingredients',
+                                           'Manufacturer','Expires',
                                            'Area','Area Units',
                                            'Rate','Rate Units'),
-                                    Result=c(Product,Details,
+                                    Result=c(Product,
+                                             DetailsList$ProductID,
+                                             DetailsList$HarvestInterval,
+                                             DetailsList$ActiveIngredients,
+                                             DetailsList$Manufacturer,
+                                             DetailsList$Expires,
                                              Area,AreaUnits,
                                              Volume,VolumeUnits),
                                     stringsAsFactors = F)

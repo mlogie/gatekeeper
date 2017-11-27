@@ -18,8 +18,9 @@ read.analysis <- function(csvdf,columns,farmfolder){
   Blank <- character(TableLen)
   
   AllTable <- data.frame(Farm,csvdf$Field.Defined.Name,Blank,Blank,
-                         csvdf$Product.Name,Blank,csvdf$Application.Area.ha,
-                         AreaUnits,csvdf$Rate.per.Application.Area.ha,RateUnits,
+                         csvdf$Product.Name,Blank,Blank,Blank,Blank,Blank,
+                         csvdf$Application.Area.ha,AreaUnits,
+                         csvdf$Rate.per.Application.Area.ha,RateUnits,
                          csvdf$Year,csvdf$Actual.Issued.Date,Blank,Blank,Blank,
                          Blank,Blank,Blank,Blank,Blank,
                          Blank,Blank,Blank,Blank,Source)
