@@ -260,7 +260,7 @@ read.detailed <- function(xlsdf,columns,farmfolder){
                                 AllDataProd,
                                 c('Year',YearTmp),
                                 AllDataTmp,
-                                c('Source','Detailed'))
+                                c('Source','Gatekeeper - Detailed'))
 
           ## We've got a table with all the data from one product application.
           ## Add it to the output list

@@ -52,7 +52,7 @@ read.condensed <- function(xlsdf,columns,farmfolder){
   for(i in 2:length(tmp)){
     tmp[[i]]$Field  <- tmp[[i]]$Date[1]
     tmp[[i]]$Crop   <- tmp[[i]]$Date[2]
-    tmp[[i]]$Source <- 'Condensed'
+    tmp[[i]]$Source <- 'Gatekeeper - Condensed'
     tmp[[i]] <- tmp[[i]][-c(1,2),]
     AllTable <- rbind(AllTable,tmp[[i]])
   }

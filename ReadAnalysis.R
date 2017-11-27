@@ -11,7 +11,7 @@ read.analysis <- function(csvdf,columns,farmfolder){
   TableLen  <- nrow(csvdf)
   Farm      <- rep(farmfolder,TableLen)
   AreaUnits <- rep('ha',TableLen)
-  Source    <- rep('Analysis',TableLen)
+  Source    <- rep('Gatekeeper - Analysis',TableLen)
   RateUnits <- paste0(csvdf$Units,'/ha')
   
   ## Create blank column for data not present in this format
