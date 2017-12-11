@@ -79,8 +79,8 @@ read.detailed <- function(xlsdf,columns,farmfolder){
     FieldNames <- c(FieldNames,paste(xlsdf[as.numeric(RowNumField[i]),1]))
     VarNames   <- c(VarNames,paste(xlsdf[as.numeric(RowNumField[i])+1,4]))
     CropNames  <- c(CropNames,paste(xlsdf[as.numeric(RowNumField[i])+2,4]))
-    MapSheet   <- c(MapSheet,paste(xlsdf[as.numeric(RowNumField[i]+1,30)]))
-    NGNumber   <- c(NGNumber,paste(xlsdf[as.numeric(RowNumField[i]+2,30)]))
+    MapSheet   <- c(MapSheet,paste(xlsdf[as.numeric(RowNumField[i])+1,30]))
+    NGNumber   <- c(NGNumber,paste(xlsdf[as.numeric(RowNumField[i])+2,30]))
   }
   ## One of the farms annoyingly has a typo where a 0 is entered as a O.  Fix this here.
   MapSheet <- gsub('([A-Z][A-Z][0-9]?)([Oo])','\\10',MapSheet)
@@ -184,7 +184,8 @@ read.detailed <- function(xlsdf,columns,farmfolder){
         ## these Products
         addsplit    <- which(!grepl('Start:|^$',tmp[[i]][[j]][[1]]))
         AllDataTmp  <- DTL[,c(1,2)]
-        AllDataField <- data.frame(Data=c('Farm','Field','Crop','Variety'),
+        AllDataField <- data.frame(Data=c('Farm','Field','Crop','Variety',
+                                          'MapSheet','NGNumber','Centroid'),
                                    Result=c(farmfolder,
                                             FieldList$FieldNames[i],
                                             FieldList$CropNames[i],
