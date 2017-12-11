@@ -78,8 +78,13 @@ read.condensed <- function(xlsdf,columns,farmfolder){
   ## Generate blank data missing from condensed operations summary
   Blank <- character(TableLen)
   
-  ## Build table
-  AllTable <- data.frame(Farm,AllTable$Field,AllTable$Crop,Blank,
+  ## Build the table
+  ## As of 11/12/17, headers are:
+  ## Farm,Field,Crop,Variety,MapSheet,NGNumber,Centroid,Product,ProductID,
+  ## Harvest Interval,Active Ingredients,Manufacturer,Expires,Area,Area Units,
+  ## Rate,Rate Units,Year,Start Date,End Date,Start Time,End Time,Weather,Temp,
+  ## Wind speed/direction,Soil,Implement,Reference,Advisor,Operator,Issued By,Source
+  AllTable <- data.frame(Farm,AllTable$Field,AllTable$Crop,Blank,Blank,Blank,Blank,
                          AllTable$Product,Blank,Blank,Blank,Blank,Blank,
                          AllTable$Area,AreaUnits,
                          AllTable$Rate,AllTable$RateUnits,

@@ -71,16 +71,28 @@ read.detailed <- function(xlsdf,columns,farmfolder){
   FieldNames  <- c('Intro')
   VarNames    <- c('Intro')
   CropNames   <- c('Intro')
+  MapSheet    <- c('Intro')
+  NGNumber    <- c('Intro')
+  Centroid    <- c('Intro')
 
   for(i in 2:length(RowNumField)){
     FieldNames <- c(FieldNames,paste(xlsdf[as.numeric(RowNumField[i]),1]))
     VarNames   <- c(VarNames,paste(xlsdf[as.numeric(RowNumField[i])+1,4]))
     CropNames  <- c(CropNames,paste(xlsdf[as.numeric(RowNumField[i])+2,4]))
+    MapSheet   <- c(MapSheet,paste(xlsdf[as.numeric(RowNumField[i]+1,30)]))
+    NGNumber   <- c(NGNumber,paste(xlsdf[as.numeric(RowNumField[i]+2,30)]))
   }
+  ## One of the farms annoyingly has a typo where a 0 is entered as a O.  Fix this here.
+  MapSheet <- gsub('([A-Z][A-Z][0-9]?)([Oo])','\\10',MapSheet)
+  ## Generate centroid for field from Map Number and NG Number.
+  ## Example: MapNumber=SU0937, NGNumber=8859, Centroid=SU09883759
+  Centroid <- paste0(substr(MapSheet,1,4),substr(NGNumber,1,2),
+                     substr(MapSheet,5,6),substr(NGNumber,3,4))
 
-  FieldList <- data.frame(RowNumField,FieldNames,VarNames,CropNames)
+  FieldList <- data.frame(RowNumField,FieldNames,VarNames,CropNames,
+                          MapSheet,NGNumber,Centroid)
   
-  ## Convert to characters, as splitting does not work so well with vectors
+  ## Convert dataframe to characters, as splitting does not work so well with vectors
   xlsdf[] <- lapply(xlsdf, as.character)
   
   ## Split the full data frame by Field, giving the preamble df the name 'Intro'
@@ -176,7 +188,10 @@ read.detailed <- function(xlsdf,columns,farmfolder){
                                    Result=c(farmfolder,
                                             FieldList$FieldNames[i],
                                             FieldList$CropNames[i],
-                                            FieldList$VarNames[i]),
+                                            FieldList$VarNames[i],
+                                            FieldList$MapSheet[i],
+                                            FieldList$NGNumber[i],
+                                            FieldList$Centroid[i]),
                                    stringsAsFactors = F)
 
         for(l in addsplit){

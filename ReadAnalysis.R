@@ -17,7 +17,12 @@ read.analysis <- function(csvdf,columns,farmfolder){
   ## Create blank column for data not present in this format
   Blank <- character(TableLen)
   
-  AllTable <- data.frame(Farm,csvdf$Field.Defined.Name,Blank,Blank,
+  ## As of 11/12/17, headers are:
+  ## Farm,Field,Crop,Variety,MapSheet,NGNumber,Centroid,Product,ProductID,
+  ## Harvest Interval,Active Ingredients,Manufacturer,Expires,Area,Area Units,
+  ## Rate,Rate Units,Year,Start Date,End Date,Start Time,End Time,Weather,Temp,
+  ## Wind speed/direction,Soil,Implement,Reference,Advisor,Operator,Issued By,Source
+  AllTable <- data.frame(Farm,csvdf$Field.Defined.Name,Blank,Blank,Blank,Blank,Blank,
                          csvdf$Product.Name,Blank,Blank,Blank,Blank,Blank,
                          csvdf$Application.Area.ha,AreaUnits,
                          csvdf$Rate.per.Application.Area.ha,RateUnits,

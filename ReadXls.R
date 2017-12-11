@@ -34,6 +34,7 @@ FileList <- FileList[grepl('xls(x)?$|csv$',FileList)]
 DataOut   <- c()
 ## Create column headers for the table
 ColHeaders  <- c('Farm','Field','Crop','Variety',
+                 'MapSheet','NGNumber','Centroid',
                  'Product','ProductID',
                  'Harvest Interval','Active Ingredients','Manufacturer','Expires',
                  'Area','Area Units','Rate','Rate Units',
