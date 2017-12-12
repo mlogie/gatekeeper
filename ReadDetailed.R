@@ -66,7 +66,7 @@ read.detailed <- function(xlsdf,columns,farmfolder){
   colnames(DatesDF) <- DateCol
  
   ## Determine the Field names from the variety column, as Field name is always directly
-  ## above the word variety in the spreadsheet
+  ## above the word 'variety' in the spreadsheet
   RowNumField <- c('Intro',RowNumField)
   FieldNames  <- c('Intro')
   VarNames    <- c('Intro')
@@ -75,13 +75,19 @@ read.detailed <- function(xlsdf,columns,farmfolder){
   NGNumber    <- c('Intro')
   Centroid    <- c('Intro')
 
+  ## Convert vectors to characters
+  xlsdf[] <- lapply(xlsdf, as.character)
+  
   for(i in 2:length(RowNumField)){
-    FieldNames <- c(FieldNames,paste(xlsdf[as.numeric(RowNumField[i]),1]))
-    VarNames   <- c(VarNames,paste(xlsdf[as.numeric(RowNumField[i])+1,4]))
-    CropNames  <- c(CropNames,paste(xlsdf[as.numeric(RowNumField[i])+2,4]))
-    MapSheet   <- c(MapSheet,paste(xlsdf[as.numeric(RowNumField[i])+1,30]))
-    NGNumber   <- c(NGNumber,paste(xlsdf[as.numeric(RowNumField[i])+2,30]))
+    FieldNames <- c(FieldNames,xlsdf[as.numeric(RowNumField[i]),1])
+    VarNames   <- c(VarNames,xlsdf[as.numeric(RowNumField[i])+1,4])
+    CropNames  <- c(CropNames,xlsdf[as.numeric(RowNumField[i])+2,4])
+    MapSheet   <- xlsdf[as.numeric(RowNumField[i])+1,
+                        grep('[0-9].$',xlsdf[as.numeric(RowNumField[i])+1,])]
+    NGNumber   <- xlsdf[as.numeric(RowNumField[i])+2,
+                        grep('[0-9].$',xlsdf[as.numeric(RowNumField[i])+2,])]
   }
+
   ## One of the farms annoyingly has a typo where a 0 is entered as a O.  Fix this here.
   MapSheet <- gsub('([A-Z][A-Z][0-9]?)([Oo])','\\10',MapSheet)
   ## Generate centroid for field from Map Number and NG Number.
