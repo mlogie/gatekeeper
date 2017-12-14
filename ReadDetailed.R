@@ -17,7 +17,8 @@ read.detailed <- function(xlsdf,columns,farmfolder){
   AllData <- c()
   
   ## Find all rows which just start with when the file was printed or 'Gatekeeper'
-  RemRow   <- which(grepl('^Printed:|^Gatekeeper',xlsdf[[1]]))
+  RemRow <- which(grepl('^Printed:|^Gate[Kk]eeper|^Detailed Operations|^Main Business',
+                  xlsdf[[1]]))
   
   ## Also find rows which have a date but no 'Start' text.  This is because a record
   ## has spilled over two pages resulting in unnecessary repetition in the spreadsheet
@@ -75,7 +76,7 @@ read.detailed <- function(xlsdf,columns,farmfolder){
   NGNumber    <- c('Intro')
   Centroid    <- c('Intro')
 
-  ## Convert vectors to characters
+  ## Convert factors to characters
   xlsdf[] <- lapply(xlsdf, as.character)
   
   for(i in 2:length(RowNumField)){
@@ -154,6 +155,12 @@ read.detailed <- function(xlsdf,columns,farmfolder){
         if(!is.na(PosTmp[1])){
           ## Found one.  Work out where the data is to be found.
           ## First, find the row using the modulus of the position in the long table
+          if(is.na(PosTmp[DTL$Occurrence[k]])){
+            ## We're expecting more than one occurrence, but we only have one
+            ## This can only happen with dates and times, so just set the occurrence
+            ## to 1, to copy the start date and time to the end date and time
+            DTL$Occurrence[k] <- 1
+          }
           DTL$RowTable[k] <- PosTmp[DTL$Occurrence[k]] %% nrowtmp
           ## This will resolve to 0 if the data is in the bottom row, so if 0, set row
           ## number to be the number of rows
@@ -188,7 +195,7 @@ read.detailed <- function(xlsdf,columns,farmfolder){
         ## We are looking at a non-intro occurrence and we have a neat list of data
         ## Problem is there is often more than one Product per event, so separate out
         ## these Products
-        addsplit    <- which(!grepl('Start:|^$',tmp[[i]][[j]][[1]]))
+        addsplit    <- which(!grepl('Start:|Finish:|^$',tmp[[i]][[j]][[1]]))
         AllDataTmp  <- DTL[,c(1,2)]
         AllDataField <- data.frame(Data=c('Farm','Field','Crop','Variety',
                                           'MapSheet','NGNumber','Centroid'),
@@ -204,38 +211,38 @@ read.detailed <- function(xlsdf,columns,farmfolder){
         for(l in addsplit){
           ## Collect the Product and application figures.  Find the row with the
           ## product then look along the row for the occurrence of numbers and other
-          ## letters which denote: Area, Area Units, Volume, Volume Units
+          ## letters which denote: Area, Area Units, Rate, Rate Units
           ProductRow <- as.character(tmp[[i]][[j]][l,])
           ## The product is always the first item in the row
           Product    <- ProductRow[1]
           
-          ## Find entries with numbers but no letters (some products contain numbers)
-          Numbers     <- grep('[0-9]+',ProductRow,value=T)
+          ## Find entries with numbers but no letters, ignoring the product column
+          Numbers     <- grep('[0-9]+',ProductRow[-1],value=T)
           NumbersOnly <- grep('[A-Za-z]+',Numbers,invert=T,value=T)
-          ## The first number is area, the second is volume
+          ## The first number is area, the second is rate
           if(!is.na(NumbersOnly[1])){
             Area <- NumbersOnly[1]
           } else {
             Area <- ''
           }
           if(!is.na(NumbersOnly[2])){
-            Volume <- NumbersOnly[2]
+            Rate <- NumbersOnly[2]
           } else {
-            Volume <- ''
+            Rate <- ''
           }
           
           ## Find entries with letters.  This will include the product (entry one)
           Text <- as.character(grep('[A-Za-z]+',ProductRow,value=T))
-          ## The second entry is area units, the third is volume units
+          ## The second entry is area units, the third is rate units
           if(!is.na(Text[2])){
             AreaUnits <- Text[2]
           } else {
             AreaUnits <- ''
           }
           if(!is.na(Text[3])){
-            VolumeUnits <- Text[3]
+            RateUnits <- Text[3]
           } else {
-            VolumeUnits <- ''
+            RateUnits <- ''
           }
 
           ## The details are a bit more complicated as they are given one row below the
@@ -259,11 +266,18 @@ read.detailed <- function(xlsdf,columns,farmfolder){
               
             }
           }
+          if(is.na(Area)|is.na(Rate)){
+            Quantity  <- ''
+          } else {
+            Quantity  <- as.numeric(Area)*as.numeric(Rate)
+          }
+          QuantUnits  <- substr(RateUnits,1,regexpr('\\/',RateUnits)[1]-1)
           AllDataProd <- data.frame(Data=c('Product','ProductID',
                                            'Harvest Interval','Active Ingredients',
                                            'Manufacturer','Expires',
                                            'Area','Area Units',
-                                           'Rate','Rate Units'),
+                                           'Rate','Rate Units',
+                                           'Quantity','Quantity Units'),
                                     Result=c(Product,
                                              DetailsList$ProductID,
                                              DetailsList$HarvestInterval,
@@ -271,7 +285,8 @@ read.detailed <- function(xlsdf,columns,farmfolder){
                                              DetailsList$Manufacturer,
                                              DetailsList$Expires,
                                              Area,AreaUnits,
-                                             Volume,VolumeUnits),
+                                             Rate,RateUnits,
+                                             Quantity,QuantUnits),
                                     stringsAsFactors = F)
           YearTmp <- substr(AllDataTmp$Result[1],
                             regexpr('\\/[0-9]*$',
@@ -302,7 +317,8 @@ read.detailed <- function(xlsdf,columns,farmfolder){
   }
   ## Name the columns
   colnames(FullTable) <- columns
-  
+
   ## Return the table
+  FullTable[] <- lapply(FullTable, as.character)
   FullTable
 }

@@ -29,7 +29,3 @@ repro.field.summary <- function(dataoutdf,columnsummary,filename='',writetofile=
   names(returnlist) <- c('msg','df')
   returnlist
 }
-
-
-
-

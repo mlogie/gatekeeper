@@ -19,6 +19,7 @@ source('./ReadDetailed.R')
 source('./ParseDetails.R')
 source('./ReadCondensed.R')
 source('./ReadAnalysis.R')
+source('./ReadAppData.R')
 source('./RemoveList.R')
 source('./OutputRepro.R')
 source('./LookupTable.R')
@@ -31,16 +32,16 @@ FileList <- list.files(file.path(datapath),recursive=T)
 FileList <- FileList[grepl('xls(x)?$|csv$',FileList)]
 
 ## Set the output
-DataOut   <- c()
+DataOut    <- c()
 ## Create column headers for the table
-ColHeaders  <- c('Farm','Field','Crop','Variety',
-                 'MapSheet','NGNumber','Centroid',
-                 'Product','ProductID',
-                 'Harvest Interval','Active Ingredients','Manufacturer','Expires',
-                 'Area','Area Units','Rate','Rate Units',
-                 'Year','Start Date','End Date','Start Time','End Time',
-                 'Weather','Temp','Wind speed/direction','Soil','Implement',
-                 'Reference','Advisor','Operator','Issued By','Source')
+ColHeaders <- c('Farm','Field','Crop','Variety',
+                'MapSheet','NGNumber','Centroid',
+                'Product','ProductID',
+                'Harvest Interval','Active Ingredients','Manufacturer','Expires',
+                'Area','Area Units','Rate','Rate Units','Quantity','Quantity Units',
+                'Year','Start Date','End Date','Start Time','End Time',
+                'Weather','Temp','Wind speed/direction','Soil','Implement',
+                'Reference','Advisor','Operator','Issued By','Source')
 
 DataOut <- data.frame()
 for(i in ColHeaders){
@@ -76,7 +77,11 @@ for(i in FileList){
   } else if(grepl('\\/Analysis.*csv$',i)){
     TmpDF <- read.analysis(mydf,ColHeaders,FarmFolder)
     FileType <- 'analysis'
+  } else if(grepl('\\/ApplicationData_',i)){
+    TmpDF <- read.appdata(mydf,ColHeaders,FarmFolder,i)
+    FileType <- 'applicationdata'
   }
+
   if(FileType!=''){
     DataOut <- rbind(DataOut,TmpDF)
     print(paste0('Finished reading (',FileType,') file ',
@@ -85,7 +90,7 @@ for(i in FileList){
     print(paste0('Did not read file (',FileType,') file ',
                  match(i,FileList),' of ',length(FileList),':'))
   }
-  print(paste('      ',(i)))
+  print(paste('   ',(i)))
 }
 
 ## Check if we have the output folder, and if not, create one for the output file
@@ -95,18 +100,9 @@ if(!dir.exists(file.path('.','Output'))){
 
 ## Make a lookup table to populate the data frame with additional data regarding
 ## product details (manufacturer, active ingredients, product ID), where possible
-LookupTable <- lookup.table(DataOut)
-## Find products in the Data Out table with no details
-Blanks  <- which(DataOut$`Active Ingredients`=='')
-## Match all these products with the products in lookup table which we do have data for
-Matches <- match(DataOut$Product[Blanks],LookupTable$Product)
-## Remove all entries which there is no match for
-Blanks  <- Blanks[which(!is.na(Matches))]
-Matches <- Matches[which(!is.na(Matches))]
-## Set all the product IDs, Active Ingredients and Manufacturers using the Lookup Table
-DataOut$ProductID[Blanks]            <- LookupTable$ProductID[Matches]
-DataOut$`Active Ingredients`[Blanks] <- LookupTable$`Active Ingredients`[Matches]
-DataOut$Manufacturer[Blanks]         <- LookupTable$Manufacturer[Matches]
+LookupList  <- lookup.table(DataOut)
+DataOut     <- LookupList$df
+LookupTable <- LookupList$lookup
 
 ## Do a bit of error checking, then, if all good, output the data frame to a csv
 if(!dir.exists(datapath)){
